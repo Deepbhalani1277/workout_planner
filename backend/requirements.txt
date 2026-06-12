@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlalchemy
+alembic
+psycopg2-binary
+pydantic[email]
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+google-auth
+google-auth-oauthlib
+google-generativeai
+redis
+sendgrid
+python-dotenv
+httpx
