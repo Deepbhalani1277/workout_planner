@@ -1,32 +1,46 @@
 """
-Email utility — sends transactional emails via SendGrid.
+Email utility — mock implementation for local development.
 
-Used for welcome emails, password resets, plan delivery, etc.
+Prints verification and password-reset links to the console
+instead of sending real emails.  This lets you test the full
+auth flow without needing a SendGrid account or SMTP server.
+
+# TODO: Replace with real email sending (SendGrid or SMTP)
+#       before deploying to production.  The function signatures
+#       are intentionally kept stable so the swap is a drop-in
+#       replacement — only the body of each function changes.
 """
-
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
 
 from app.config import get_settings
 
 settings = get_settings()
 
 
-def send_email(to_email: str, subject: str, html_content: str) -> bool:
+def send_verification_email(email: str, token: str) -> None:
     """
-    Send a single transactional email.
+    Print an email-verification link to the console.
 
-    Returns True on success, False on failure.
+    In production this would send an HTML email via SendGrid
+    containing a clickable button / link.
     """
-    message = Mail(
-        from_email="noreply@workoutplanner.app",
-        to_emails=to_email,
-        subject=subject,
-        html_content=html_content,
-    )
-    try:
-        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        sg.send(message)
-        return True
-    except Exception:
-        return False
+    link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    print("\n" + "=" * 60)
+    print("📧  VERIFICATION EMAIL (mock)")
+    print(f"   To:   {email}")
+    print(f"   Link: {link}")
+    print("=" * 60 + "\n")
+
+
+def send_password_reset_email(email: str, token: str) -> None:
+    """
+    Print a password-reset link to the console.
+
+    In production this would send an HTML email via SendGrid
+    containing a clickable button / link.
+    """
+    link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+    print("\n" + "=" * 60)
+    print("🔑  PASSWORD RESET EMAIL (mock)")
+    print(f"   To:   {email}")
+    print(f"   Link: {link}")
+    print("=" * 60 + "\n")
