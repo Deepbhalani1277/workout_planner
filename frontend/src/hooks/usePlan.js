@@ -5,7 +5,7 @@
  * with loading states and error handling.
  */
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import useWorkoutStore from "../store/workoutStore";
 import useDietStore from "../store/dietStore";
 import workoutService from "../services/workoutService";
@@ -39,7 +39,7 @@ export default function usePlan() {
   const [isFetchingWorkout, setIsFetchingWorkout] = useState(false);
   const [isFetchingDiet, setIsFetchingDiet] = useState(false);
 
-  const fetchWorkout = async () => {
+  const fetchWorkout = useCallback(async () => {
     setIsFetchingWorkout(true);
     try {
       const { data } = await workoutService.getActivePlan();
@@ -54,9 +54,9 @@ export default function usePlan() {
     } finally {
       setIsFetchingWorkout(false);
     }
-  };
+  }, [setWorkoutPlan]);
 
-  const fetchDiet = async () => {
+  const fetchDiet = useCallback(async () => {
     setIsFetchingDiet(true);
     try {
       const { data } = await dietService.getActivePlan();
@@ -71,9 +71,9 @@ export default function usePlan() {
     } finally {
       setIsFetchingDiet(false);
     }
-  };
+  }, [setDietPlan]);
 
-  const generateWorkout = async () => {
+  const generateWorkout = useCallback(async () => {
     setIsGeneratingWorkout(true);
     try {
       const { data } = await workoutService.generatePlan();
@@ -82,9 +82,9 @@ export default function usePlan() {
     } finally {
       setIsGeneratingWorkout(false);
     }
-  };
+  }, [setWorkoutPlan]);
 
-  const generateDiet = async () => {
+  const generateDiet = useCallback(async () => {
     setIsGeneratingDiet(true);
     try {
       const { data } = await dietService.generatePlan();
@@ -93,9 +93,9 @@ export default function usePlan() {
     } finally {
       setIsGeneratingDiet(false);
     }
-  };
+  }, [setDietPlan]);
 
-  const swapMeal = async (day, mealSlot) => {
+  const swapMeal = useCallback(async (day, mealSlot) => {
     const { data } = await dietService.swapMeal(day, mealSlot);
     // Update the diet plan in store with the swapped meal
     if (dietPlan) {
@@ -116,7 +116,7 @@ export default function usePlan() {
       setDietPlan(updatedPlan);
     }
     return data;
-  };
+  }, [dietPlan, setDietPlan]);
 
   return {
     workoutPlan,

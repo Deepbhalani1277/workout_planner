@@ -18,12 +18,7 @@ export default function ProgressBar({ currentStep, totalSteps = 7 }) {
           {Math.round(percent)}%
         </span>
       </div>
-      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+
       <div className="flex gap-1 mt-3">
         {Array.from({ length: totalSteps }, (_, i) => (
           <div
