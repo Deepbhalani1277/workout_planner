@@ -26,6 +26,9 @@ from app.api.v1.users import router as users_router
 from app.api.v1.workout import router as workout_router
 from app.api.v1.diet import router as diet_router
 
+# ── Import DB Base (registers all models for SQLAlchemy) ──────
+import app.db.base  # noqa: F401
+
 settings = get_settings()
 
 # ── App instance ──────────────────────────────────────────────
