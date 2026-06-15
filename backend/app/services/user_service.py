@@ -176,7 +176,7 @@ class UserService:
 
         db.commit()
 
-        return {"message": "Profile updated successfully"}
+        return {"message": "Profile updated successfully", "is_complete": profile.is_complete}
 
     # ── 6. Delete Account ─────────────────────────────────────
 
