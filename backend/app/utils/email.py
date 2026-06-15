@@ -25,7 +25,7 @@ def send_verification_email(email: str, token: str) -> None:
     """
     link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
     print("\n" + "=" * 60)
-    print("📧  VERIFICATION EMAIL (mock)")
+    print("[EMAIL] VERIFICATION EMAIL (mock)")
     print(f"   To:   {email}")
     print(f"   Link: {link}")
     print("=" * 60 + "\n")
@@ -40,7 +40,7 @@ def send_password_reset_email(email: str, token: str) -> None:
     """
     link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
     print("\n" + "=" * 60)
-    print("🔑  PASSWORD RESET EMAIL (mock)")
+    print("[KEY] PASSWORD RESET EMAIL (mock)")
     print(f"   To:   {email}")
     print(f"   Link: {link}")
     print("=" * 60 + "\n")

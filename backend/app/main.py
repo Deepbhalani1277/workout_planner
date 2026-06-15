@@ -105,10 +105,10 @@ async def request_size_limiter(request: Request, call_next) -> Response:
 # Rate limit rules:
 #   key_prefix           limit   window_seconds
 RATE_LIMIT_RULES = {
-    "/api/v1/auth/login":        (5,  15 * 60),     # 5 per IP per 15 min
-    "/api/v1/auth/register":     (3,  60 * 60),     # 3 per IP per hour
-    "/api/v1/workout/generate":  (5,  24 * 60 * 60), # 5 per user per day
-    "/api/v1/diet/generate":     (5,  24 * 60 * 60), # 5 per user per day
+    "/api/v1/auth/login":        (20, 15 * 60),     # 20 per IP per 15 min
+    "/api/v1/auth/register":     (20, 60 * 60),     # 20 per IP per hour
+    "/api/v1/workout/generate":  (10, 24 * 60 * 60), # 10 per user per day
+    "/api/v1/diet/generate":     (10, 24 * 60 * 60), # 10 per user per day
 }
 
 # Global rate limit: 100 requests per IP per minute

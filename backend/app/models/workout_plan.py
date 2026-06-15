@@ -22,7 +22,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base
+from app.db.base_class import Base
 
 
 class WorkoutPlan(Base):

@@ -31,7 +31,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # ── Import all models via Base so metadata is complete ────────
-from app.db.base import Base  # noqa: E402
+from app.db.base import Base  # noqa: E402  # imports all models too
 
 target_metadata = Base.metadata
 
