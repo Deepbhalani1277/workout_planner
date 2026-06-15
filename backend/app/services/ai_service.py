@@ -77,7 +77,7 @@ class AIService:
 
         genai.configure(api_key=api_key)
 
-        return genai.GenerativeModel("gemini-1.5-flash")
+        return genai.GenerativeModel("gemini-flash-latest")
 
     # ── Response parsing & validation ─────────────────────────
 
@@ -110,7 +110,8 @@ class AIService:
         # Parse JSON
         try:
             data = json.loads(text)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"JSON Decode Error: {e}. Raw text: {repr(text)}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="AI returned invalid response. Please try again.",
@@ -164,16 +165,19 @@ class AIService:
         for attempt in range(max_retries):
             try:
                 response = model.generate_content(prompt)
+                print(f"Gemini raw response (attempt {attempt}):", response.text)
                 return response.text
             except Exception as e:
+                print(f"Gemini error on attempt {attempt}:", repr(e))
                 last_error = e
                 if attempt < max_retries - 1:
                     time.sleep(2)  # Brief pause before retry
 
         # All retries exhausted
+        print("All Gemini retries exhausted. Last error:", repr(last_error))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="AI service temporarily unavailable. Please try again later.",
+            detail=f"AI service temporarily unavailable: {repr(last_error)}",
         )
 
     # ── Cache key builder ─────────────────────────────────────
