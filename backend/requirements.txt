@@ -10,7 +10,7 @@ passlib[bcrypt]
 python-multipart
 google-auth
 google-auth-oauthlib
-google-generativeai
+groq
 redis
 sendgrid
 python-dotenv

@@ -1,6 +1,6 @@
 # FitPlan - AI Personalized Workout & Diet Planner 🏋️‍♀️🥗
 
-FitPlan is an intelligent, full-stack web application that generates highly personalized 7-day workout and Indian diet plans. It uses Google's Gemini AI to analyze a user's body metrics, fitness goals, activity levels, diet preferences, and equipment availability to output custom routines and meals.
+FitPlan is an intelligent, full-stack web application that generates highly personalized 7-day workout and Indian diet plans. It uses Groq's Llama 3 AI to analyze a user's body metrics, fitness goals, activity levels, diet preferences, and equipment availability to output custom routines and meals.
 
 ![FitPlan Preview](https://via.placeholder.com/1200x600.png?text=FitPlan+-+Your+Personal+AI+Fitness+Coach)
 
@@ -30,7 +30,7 @@ FitPlan is an intelligent, full-stack web application that generates highly pers
 - PostgreSQL (Primary Database)
 - SQLAlchemy + Alembic (ORM & Migrations)
 - Redis (Caching & Rate Limiting)
-- Google Gemini AI SDK (LLM integration)
+- Groq API SDK (LLM integration)
 
 ---
 
@@ -41,7 +41,7 @@ FitPlan is an intelligent, full-stack web application that generates highly pers
 - Python (v3.10+)
 - PostgreSQL installed and running
 - Redis installed and running
-- Google Gemini API Key
+- Groq API Key
 
 ### 1. Backend Setup
 
@@ -75,7 +75,7 @@ FitPlan is an intelligent, full-stack web application that generates highly pers
    ACCESS_TOKEN_EXPIRE_MINUTES=30
    REFRESH_TOKEN_EXPIRE_DAYS=7
 
-   GEMINI_API_KEY=your_gemini_api_key_here
+   GROQ_API_KEYS=gsk_your_groq_api_key_1,gsk_your_groq_api_key_2
    
    FRONTEND_URL=http://localhost:5173
    ```

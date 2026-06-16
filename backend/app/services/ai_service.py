@@ -1,25 +1,20 @@
 """
-AI service — wrapper around Google Gemini.
+AI service — wrapper around Groq API.
 
 Provides a single interface for the rest of the app to request
-AI-generated workout and diet plans.  Prompt construction is
+AI-generated workout and diet plans. Prompt construction is
 delegated to utils/prompt_builder.py.
 
 Architecture:
- • _get_gemini_client()        → initialises the Gemini model
- • _generate_with_retry()      → calls Gemini with retry logic
- • _parse_and_validate_response() → strips fences, parses JSON,
-                                    validates structure
- • generate_workout_plan()     → builds prompt, calls Gemini,
-                                  caches in Redis
+ • _generate_with_retry()      → calls Groq with multi-key rotation and retry logic
+ • _parse_and_validate_response() → parses JSON, validates structure
+ • generate_workout_plan()     → builds prompt, calls Groq, caches in Redis
  • generate_diet_plan()        → same pattern for diet
- • swap_meal()                 → generates a single replacement
-                                  meal (no caching)
+ • swap_meal()                 → generates a single replacement meal (no caching)
 
 Security:
- • GEMINI_API_KEY loaded from env only, never hardcoded.
- • Never logs or exposes the API key.
- • Never sends user PII (name, email) to Gemini.
+ • GROQ_API_KEYS loaded from env only, never hardcoded.
+ • Never sends user PII (name, email) to Groq.
  • Free-text fields sanitised in prompt_builder before insertion.
 """
 
@@ -29,6 +24,7 @@ import re
 import time
 
 from fastapi import HTTPException, status
+import groq
 
 from app.config import get_settings
 from app.core.redis import delete_token, get_token, store_token
@@ -51,33 +47,7 @@ class AIService:
     can be called without instantiation.
     """
 
-    # ── Gemini client ─────────────────────────────────────────
-
-    @staticmethod
-    def _get_gemini_client():
-        """
-        Initialise and return a Gemini GenerativeModel instance.
-
-        Uses google.generativeai (the currently installed SDK).
-        Configures with GEMINI_API_KEY from environment and
-        returns the gemini-1.5-flash model — fast and cheap,
-        ideal for structured JSON generation.
-
-        Raises a clear error if the API key is missing so the
-        developer knows exactly what to fix.
-        """
-        import google.generativeai as genai
-
-        api_key = settings.GEMINI_API_KEY
-        if not api_key or api_key == "your-gemini-api-key":
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="GEMINI_API_KEY is not configured. Set it in .env",
-            )
-
-        genai.configure(api_key=api_key)
-
-        return genai.GenerativeModel("gemini-flash-latest")
+    _current_key_index = 0
 
     # ── Response parsing & validation ─────────────────────────
 
@@ -87,22 +57,17 @@ class AIService:
         plan_type: str,
     ) -> dict:
         """
-        Parse raw Gemini output into a validated Python dict.
+        Parse raw Groq output into a validated Python dict.
 
         Steps:
          1. Strip markdown code fences (```json ... ``` or ``` ... ```)
          2. Strip leading/trailing whitespace
          3. Parse as JSON
          4. Validate required keys based on plan_type
-
-        Raises HTTPException 502 if parsing or validation fails —
-        502 signals "bad gateway" (upstream service returned garbage),
-        prompting the client to retry.
         """
         text = response_text.strip()
 
-        # Strip markdown code fences — Gemini sometimes wraps
-        # output in ```json ... ``` despite being told not to
+        # Strip markdown code fences just in case
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
         text = text.strip()
@@ -143,7 +108,7 @@ class AIService:
 
         return data
 
-    # ── Retry wrapper ─────────────────────────────────────────
+    # ── Retry & Rotation wrapper ──────────────────────────────
 
     @staticmethod
     def _generate_with_retry(
@@ -151,33 +116,57 @@ class AIService:
         max_retries: int = 3,
     ) -> str:
         """
-        Call Gemini API with automatic retry on failure.
+        Call Groq API with automatic multi-key rotation and retry on failure.
 
-        Retries up to max_retries times with a 2-second delay
-        between attempts.  If all retries fail, raises 502
-        so the client knows the AI backend is temporarily down.
-
-        Returns the raw response text on success.
+        If a key hits a RateLimitError (quota exceeded) or AuthenticationError,
+        it automatically switches to the next key in the comma-separated list
+        from the environment variables.
         """
-        model = AIService._get_gemini_client()
+        keys = [k.strip() for k in settings.GROQ_API_KEYS.split(",") if k.strip()]
+        if not keys:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="GROQ_API_KEYS is not configured. Set it in .env"
+            )
+
         last_error = None
 
-        for attempt in range(max_retries):
-            try:
-                response = model.generate_content(prompt)
-                print(f"Gemini raw response (attempt {attempt}):", response.text)
-                return response.text
-            except Exception as e:
-                print(f"Gemini error on attempt {attempt}:", repr(e))
-                last_error = e
-                if attempt < max_retries - 1:
-                    time.sleep(2)  # Brief pause before retry
+        # Try up to the number of keys we have available
+        for _ in range(len(keys)):
+            current_key = keys[AIService._current_key_index % len(keys)]
+            client = groq.Groq(api_key=current_key)
 
-        # All retries exhausted
-        print("All Gemini retries exhausted. Last error:", repr(last_error))
+            for attempt in range(max_retries):
+                try:
+                    response = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "system", "content": "You are a helpful JSON generation assistant."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        response_format={"type": "json_object"}
+                    )
+                    return response.choices[0].message.content
+                except (groq.RateLimitError, groq.AuthenticationError) as e:
+                    # Quota exceeded or Invalid key — rotate immediately!
+                    print(f"Groq Key starting with {current_key[:12]}... failed: {e.__class__.__name__}. Rotating to next key.")
+                    last_error = e
+                    break  # Break inner loop to move to the next key
+                except Exception as e:
+                    # Random API timeout or error — retry same key
+                    print(f"Groq Error on attempt {attempt}: {repr(e)}")
+                    last_error = e
+                    if attempt < max_retries - 1:
+                        time.sleep(2)
+            
+            # Increment the index to use the next key for the next loop iteration (or future requests)
+            AIService._current_key_index += 1
+
+        # If we exit the outer loop, all keys and retries failed
+        print("All API keys and retries exhausted. Last error:", repr(last_error))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI service temporarily unavailable: {repr(last_error)}",
+            detail="AI service temporarily unavailable. Quota/Rate limit exceeded on all keys.",
         )
 
     # ── Cache key builder ─────────────────────────────────────
@@ -195,26 +184,12 @@ class AIService:
         return f"{prefix}:{hash_val}"
 
     # ── Generate Workout Plan ─────────────────────────────────
-    # RATE LIMIT: max 5 calls per user per day (enforced in middleware)
 
     @staticmethod
     def generate_workout_plan(profile) -> dict:
         """
-        Generate a 7-day personalised workout plan.
-
-        Flow:
-         1. Build a cache key from the profile fields that
-            influence the workout (age, gender, weight, height,
-            goal, equipment, activity level)
-         2. Check Redis — if cached, return immediately
-            (saves an API call and ~2-3 seconds of latency)
-         3. Build the prompt via prompt_builder
-         4. Call Gemini with retry
-         5. Parse and validate the JSON response
-         6. Cache for 24 hours in Redis
-         7. Return the validated plan
+        Generate a 7-day personalised workout plan using Groq.
         """
-        # Cache key from workout-relevant fields
         cache_key = AIService._build_cache_key(
             "workout",
             age=profile.age,
@@ -226,33 +201,24 @@ class AIService:
             activity=profile.activity_level,
         )
 
-        # Check cache
         cached = get_token(cache_key)
         if cached:
             return json.loads(cached)
 
-        # Generate
         prompt = build_workout_prompt(profile)
         response_text = AIService._generate_with_retry(prompt)
         plan = AIService._parse_and_validate_response(response_text, "workout")
 
-        # Cache for 24 hours
         store_token(cache_key, json.dumps(plan), ttl_seconds=86400)
-
         return plan
 
     # ── Generate Diet Plan ────────────────────────────────────
-    # RATE LIMIT: max 5 calls per user per day (enforced in middleware)
 
     @staticmethod
     def generate_diet_plan(profile) -> dict:
         """
-        Generate a 7-day personalised Indian diet plan.
-
-        Same flow as generate_workout_plan but with diet-specific
-        cache key fields (includes diet_type, allergies, budget).
+        Generate a 7-day personalised Indian diet plan using Groq.
         """
-        # Cache key from diet-relevant fields
         cache_key = AIService._build_cache_key(
             "diet",
             age=profile.age,
@@ -265,19 +231,15 @@ class AIService:
             budget=profile.budget_range,
         )
 
-        # Check cache
         cached = get_token(cache_key)
         if cached:
             return json.loads(cached)
 
-        # Generate
         prompt = build_diet_prompt(profile)
         response_text = AIService._generate_with_retry(prompt)
         plan = AIService._parse_and_validate_response(response_text, "diet")
 
-        # Cache for 24 hours
         store_token(cache_key, json.dumps(plan), ttl_seconds=86400)
-
         return plan
 
     # ── Swap Meal ─────────────────────────────────────────────
@@ -285,16 +247,7 @@ class AIService:
     @staticmethod
     def swap_meal(profile, day: str, meal_slot: str) -> dict:
         """
-        Generate a single replacement meal.
-
-        NOT cached — every swap should return a different meal
-        to give the user variety.
-
-        Args:
-            profile: ORM Profile object
-            day: e.g. "Monday"
-            meal_slot: one of "breakfast", "lunch", "dinner",
-                       "snack_1", "snack_2"
+        Generate a single replacement meal using Groq.
         """
         prompt = build_swap_meal_prompt(profile, day, meal_slot)
         response_text = AIService._generate_with_retry(prompt)
