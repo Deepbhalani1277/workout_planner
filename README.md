@@ -4,6 +4,9 @@ FitPlan is an intelligent, full-stack web application that generates highly pers
 
 ![FitPlan Preview](https://via.placeholder.com/1200x600.png?text=FitPlan+-+Your+Personal+AI+Fitness+Coach)
 
+### 🌍 Live Deployment
+- **Live Demo (Frontend)**: [https://workout-planner-ochre.vercel.app/](https://workout-planner-ochre.vercel.app/)
+- **API Backend**: [https://workout-planner-3ro6.onrender.com/](https://workout-planner-3ro6.onrender.com/)
 ## ✨ Features
 
 - **Auth & Security:** Secure JWT-based authentication with refresh token rotation and in-memory access token storage.
