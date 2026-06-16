@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
 
-    # ── Google Gemini AI ──────────────────────────────────────
-    GEMINI_API_KEY: str
+    # ── OpenAI API Keys ───────────────────────────────────────
+    OPENAI_API_KEYS: str
 
     # ── Redis ─────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"
