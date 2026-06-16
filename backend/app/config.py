@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # ── SendGrid Email ────────────────────────────────────────
-    SENDGRID_API_KEY: str
+    SENDGRID_API_KEY: str | None = None
 
     # ── Frontend ──────────────────────────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"
