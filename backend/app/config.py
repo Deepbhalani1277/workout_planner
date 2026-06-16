@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # ── Database ──────────────────────────────────────────────
     DATABASE_URL: str
+    TEST_DATABASE_URL: str | None = None
 
     # ── JWT Authentication ────────────────────────────────────
     SECRET_KEY: str
@@ -29,8 +30,8 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
 
-    # ── OpenAI API Keys ───────────────────────────────────────
-    OPENAI_API_KEYS: str
+    # ── Groq API Keys ───────────────────────────────────────
+    GROQ_API_KEYS: str
 
     # ── Redis ─────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"

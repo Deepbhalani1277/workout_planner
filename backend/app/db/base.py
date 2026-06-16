@@ -7,15 +7,13 @@ autogenerate reads this metadata to detect schema changes.
 
 If you add a new model file, import it here — otherwise Alembic
 will not see it and will not generate a migration for it.
+
+IMPORTANT: Models should import Base from `app.db.base_class` (not
+this file) to avoid circular imports.  This file is the ONLY place
+that imports all models — it's the "registry" entrypoint.
 """
 
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Base(DeclarativeBase):
-    """Shared declarative base for all SQLAlchemy models (2.0 style)."""
-    pass
-
+from app.db.base_class import Base  # noqa: F401
 
 # ── Import every model so Base.metadata registers their tables ──
 from app.models.user import User                    # noqa: E402, F401

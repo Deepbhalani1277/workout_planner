@@ -1,20 +1,20 @@
 """
-AI service — wrapper around OpenAI.
+AI service — wrapper around Groq API.
 
 Provides a single interface for the rest of the app to request
 AI-generated workout and diet plans. Prompt construction is
 delegated to utils/prompt_builder.py.
 
 Architecture:
- • _generate_with_retry()      → calls OpenAI with multi-key rotation and retry logic
+ • _generate_with_retry()      → calls Groq with multi-key rotation and retry logic
  • _parse_and_validate_response() → parses JSON, validates structure
- • generate_workout_plan()     → builds prompt, calls OpenAI, caches in Redis
+ • generate_workout_plan()     → builds prompt, calls Groq, caches in Redis
  • generate_diet_plan()        → same pattern for diet
  • swap_meal()                 → generates a single replacement meal (no caching)
 
 Security:
- • OPENAI_API_KEYS loaded from env only, never hardcoded.
- • Never sends user PII (name, email) to OpenAI.
+ • GROQ_API_KEYS loaded from env only, never hardcoded.
+ • Never sends user PII (name, email) to Groq.
  • Free-text fields sanitised in prompt_builder before insertion.
 """
 
@@ -24,7 +24,7 @@ import re
 import time
 
 from fastapi import HTTPException, status
-import openai
+import groq
 
 from app.config import get_settings
 from app.core.redis import delete_token, get_token, store_token
@@ -57,7 +57,7 @@ class AIService:
         plan_type: str,
     ) -> dict:
         """
-        Parse raw OpenAI output into a validated Python dict.
+        Parse raw Groq output into a validated Python dict.
 
         Steps:
          1. Strip markdown code fences (```json ... ``` or ``` ... ```)
@@ -116,17 +116,17 @@ class AIService:
         max_retries: int = 3,
     ) -> str:
         """
-        Call OpenAI API with automatic multi-key rotation and retry on failure.
+        Call Groq API with automatic multi-key rotation and retry on failure.
 
         If a key hits a RateLimitError (quota exceeded) or AuthenticationError,
         it automatically switches to the next key in the comma-separated list
         from the environment variables.
         """
-        keys = [k.strip() for k in settings.OPENAI_API_KEYS.split(",") if k.strip()]
+        keys = [k.strip() for k in settings.GROQ_API_KEYS.split(",") if k.strip()]
         if not keys:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="OPENAI_API_KEYS is not configured. Set it in .env"
+                detail="GROQ_API_KEYS is not configured. Set it in .env"
             )
 
         last_error = None
@@ -134,12 +134,12 @@ class AIService:
         # Try up to the number of keys we have available
         for _ in range(len(keys)):
             current_key = keys[AIService._current_key_index % len(keys)]
-            client = openai.OpenAI(api_key=current_key)
+            client = groq.Groq(api_key=current_key)
 
             for attempt in range(max_retries):
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4o-mini",
+                        model="llama-3.3-70b-versatile",
                         messages=[
                             {"role": "system", "content": "You are a helpful JSON generation assistant."},
                             {"role": "user", "content": prompt}
@@ -147,14 +147,14 @@ class AIService:
                         response_format={"type": "json_object"}
                     )
                     return response.choices[0].message.content
-                except (openai.RateLimitError, openai.AuthenticationError) as e:
+                except (groq.RateLimitError, groq.AuthenticationError) as e:
                     # Quota exceeded or Invalid key — rotate immediately!
-                    print(f"OpenAI Key starting with {current_key[:12]}... failed: {e.__class__.__name__}. Rotating to next key.")
+                    print(f"Groq Key starting with {current_key[:12]}... failed: {e.__class__.__name__}. Rotating to next key.")
                     last_error = e
                     break  # Break inner loop to move to the next key
                 except Exception as e:
                     # Random API timeout or error — retry same key
-                    print(f"OpenAI Error on attempt {attempt}: {repr(e)}")
+                    print(f"Groq Error on attempt {attempt}: {repr(e)}")
                     last_error = e
                     if attempt < max_retries - 1:
                         time.sleep(2)
@@ -188,7 +188,7 @@ class AIService:
     @staticmethod
     def generate_workout_plan(profile) -> dict:
         """
-        Generate a 7-day personalised workout plan using OpenAI.
+        Generate a 7-day personalised workout plan using Groq.
         """
         cache_key = AIService._build_cache_key(
             "workout",
@@ -217,7 +217,7 @@ class AIService:
     @staticmethod
     def generate_diet_plan(profile) -> dict:
         """
-        Generate a 7-day personalised Indian diet plan using OpenAI.
+        Generate a 7-day personalised Indian diet plan using Groq.
         """
         cache_key = AIService._build_cache_key(
             "diet",
@@ -247,7 +247,7 @@ class AIService:
     @staticmethod
     def swap_meal(profile, day: str, meal_slot: str) -> dict:
         """
-        Generate a single replacement meal using OpenAI.
+        Generate a single replacement meal using Groq.
         """
         prompt = build_swap_meal_prompt(profile, day, meal_slot)
         response_text = AIService._generate_with_retry(prompt)
