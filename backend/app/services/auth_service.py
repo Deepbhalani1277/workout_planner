@@ -178,7 +178,7 @@ class AuthService:
             full_name=full_name,
             password_hash=hashed_pw,
             auth_provider=AuthProvider.EMAIL,
-            is_verified=False,
+            is_verified=True,  # Bypassing email verification
         )
         db.add(user)
         db.flush()  # get user.id without committing yet
@@ -186,22 +186,9 @@ class AuthService:
         # Create empty profile
         profile = Profile(user_id=user.id)
         db.add(profile)
-
-        # Verification token → Redis
-        raw_token = str(uuid.uuid4())
-        token_h = hash_token(raw_token)
-        store_token(
-            key=f"verify:{token_h}",
-            value=str(user.id),
-            ttl_seconds=86400,  # 24 hours
-        )
-
         db.commit()
 
-        # Mock email
-        send_verification_email(email, raw_token)
-
-        return {"message": "Registration successful. Please check your email to verify your account."}
+        return {"message": "Registration successful. You can now log in."}
 
     # ── 2. Verify Email ───────────────────────────────────────
 
@@ -263,11 +250,7 @@ class AuthService:
                 detail="Invalid credentials",
             )
 
-        if not user.is_verified:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Please verify your email before logging in",
-            )
+        # Verification check bypassed
 
         if not user.is_active:
             raise HTTPException(
